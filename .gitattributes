@@ -1,0 +1,11 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Binary assets — never touch
+*.wasm    binary
+*.data    binary
+*.tflite  binary
+*.binarypb binary
+*.png     binary
+*.jpg     binary
+*.ico     binary
