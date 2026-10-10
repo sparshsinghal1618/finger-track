@@ -4,6 +4,10 @@
 
 ![FINGER TRACK preview](assets/preview.svg)
 
+> **▶ Live demo:** https://sparshsinghal1618.github.io/finger-track/
+>
+> Allow camera access when prompted. Requires a modern browser over HTTPS.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Made with MediaPipe](https://img.shields.io/badge/Made%20with-MediaPipe%20Hands-00A67E)
 ![No build step](https://img.shields.io/badge/build-none%20needed-blue)
