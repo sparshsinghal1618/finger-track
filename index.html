@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FINGER TRACK — Hand Gesture Tracker</title>
+<meta name="description" content="Real-time hand tracking in the browser. Detect gestures, read numbers 0-7, and draw in the air with both index fingers using MediaPipe Hands.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="FINGER TRACK — Hand Gesture Tracker">
+<meta property="og:description" content="Real-time hand tracking in the browser with MediaPipe Hands.">
+<meta property="og:image" content="assets/preview.svg">
+<style>
+  :root {
+    --bg: #000000;
+    --panel: #080808;
+    --card: #0d0d0d;
+    --line: #1f1f1f;
+    --fg: #e6e6e6;
+    --dim: #616161;
+    --accent: #ffffff;
+    --num: #ff2436;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #101010 0%, var(--bg) 60%);
+    color: var(--fg);
+    font-family: 'Segoe UI', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px;
+  }
+  h1 {
+    font-size: 24px;
+    letter-spacing: 10px;
+    color: #fff;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+  }
+  .sub {
+    color: var(--dim);
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .stage {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 1280px;
+  }
+  .cam-wrap { position: relative; flex: 1 1 600px; max-width: 1280px; min-width: 300px; }
+  canvas {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: block;
+    background: #000;
+    box-shadow: 0 0 40px rgba(0,0,0,.9);
+  }
+  video {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 190px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    opacity: .92;
+    pointer-events: none;
+    display: none;
+    z-index: 5;
+  }
+  video.on { display: block; }
+  #camHint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--dim);
+    text-align: center;
+    font-size: 14px;
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  .panel {
+    flex: 0 0 290px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 380px;
+  }
+  .panel h2 {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--dim);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  .controls { display: flex; flex-direction: column; gap: 8px; }
+  .controls button {
+    background: #0a0a0a;
+    color: var(--fg);
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 9px 12px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: left;
+    transition: border-color .15s ease;
+  }
+  .controls button:hover { border-color: var(--accent); color: #fff; }
+  .controls button.x { color: #c9c9c9; }
+  .controls button.primary { background: #fff; color: #000; font-weight: 700; border-color: #fff; }
+  .controls button.primary:hover { box-shadow: 0 0 18px rgba(255,255,255,.35); color: #000; }
+
+  .colorrows { display: flex; flex-direction: column; gap: 8px; }
+  .swatchrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: #0a0a0a;
+  }
+  .swlabel {
+    color: var(--dim);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .swatches { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+  .swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid #3a3a3a;
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.sel { outline: 2px solid #fff; outline-offset: 1px; }
+  .swatchrow input[type="color"] {
+    width: 34px;
+    height: 26px;
+    padding: 2px;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    background: #0a0a0a;
+    cursor: pointer;
+  }
+  .swatchrow input[type="color"]:hover { border-color: #fff; }
+
+  .hand {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    background: var(--card);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hand.on { display: flex; }
+  .hd { display: flex; justify-content: space-between; align-items: baseline; }
+  .hlabel { font-weight: 700; letter-spacing: 2px; color: #fff; font-size: 12px; }
+  .hconf { color: var(--dim); font-size: 11px; }
+  .number {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 4px 0;
+  }
+  .number b {
+    font-size: 44px;
+    font-weight: 800;
+    color: var(--num);
+    line-height: 1;
+    text-shadow: 0 0 18px rgba(255,36,54,.45);
+  }
+  .number i {
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+  .number b.idle { color: #2a2a2a; text-shadow: none; }
+  .gesture {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #fff;
+    min-height: 1.4em;
+    text-transform: uppercase;
+  }
+  .gesture.idle { color: #2a2a2a; }
+  .lights { display: flex; gap: 6px; }
+  .light {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 6px 0;
+    border: 1px solid #262626;
+    border-radius: 6px;
+    color: #3a3a3a;
+    background: #090909;
+  }
+  .light.on {
+    color: #000;
+    background: #fff;
+    border-color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 8px rgba(255,255,255,.35);
+  }
+  .hrow { display: flex; justify-content: space-between; color: var(--dim); font-size: 12px; }
+  .hrow b { color: var(--fg); font-weight: 600; }
+  .stats { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); }
+  .stat b { color: var(--fg); font-weight: 600; }
+
+  #msg {
+    text-align: center;
+    color: var(--dim);
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin-top: 14px;
+    line-height: 2;
+  }
+  #msg button {
+    background: transparent;
+    color: #fff;
+    border: 1px solid var(--fg);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 22px;
+    cursor: pointer;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  #msg button:hover { background: #fff; color: #000; }
+  .hidden { display: none !important; }
+  #err {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0a0a0a;
+    border: 1px solid var(--num);
+    color: #ff8894;
+    font-size: 12px;
+    padding: 4px 12px;
+    z-index: 20;
+    white-space: nowrap;
+    max-width: 96vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #err.ok { border-color: #fff; color: #fff; }
+  @media (max-width: 700px) {
+    .panel { flex-basis: 100%; }
+    video { width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+  <h1>FINGER TRACK</h1>
+  <div class="sub">GESTURES · NUMBERS · DRAW SHAPES WITH BOTH FINGERS</div>
+
+  <div class="stage">
+    <div class="cam-wrap">
+      <canvas id="cv"></canvas>
+      <div id="camHint">Press Start Camera. Point index fingers and draw in the air.</div>
+      <video id="video" autoplay playsinline muted></video>
+    </div>
+
+    <div class="panel">
+      <h2>Controls</h2>
+      <div class="controls">
+        <button id="startBtn" class="primary">[ Start Camera ]</button>
+        <button id="mirrorBtn" class="x">Mirror: ON</button>
+        <button id="drawBtn" class="x">Draw: OFF</button>
+        <button id="clearDrawBtn">Clear drawing</button>
+      </div>
+
+      <div class="colorrows">
+        <div class="swatchrow">
+          <span class="swlabel" id="bl1">Brush 1</span>
+          <div class="swatches" id="sw1"></div>
+          <input type="color" id="color1" value="#e6e6e6">
+        </div>
+        <div class="swatchrow">
+          <span class="swlabel" id="bl2">Brush 2</span>
+          <div class="swatches" id="sw2"></div>
+          <input type="color" id="color2" value="#ff2436">
+        </div>
+      </div>
+
+      <h2>Hand 1 · White brush</h2>
+      <div class="hand" id="h1">
+        <div class="hd"><span class="hlabel">HAND 1</span><span class="hconf"></span></div>
+        <div class="number"><b id="h1number" class="idle">–</b><i>Number</i></div>
+        <div class="gesture idle" id="h1gname">-</div>
+        <div class="lights">
+          <span class="light" data-f="T">T</span>
+          <span class="light" data-f="I">I</span>
+          <span class="light" data-f="M">M</span>
+          <span class="light" data-f="R">R</span>
+          <span class="light" data-f="P">P</span>
+        </div>
+        <div class="hrow"><span>INDEX</span><b id="h1idx">-</b></div>
+        <div class="hrow"><span>SPEED</span><b id="h1spd">-</b></div>
+      </div>
+
+      <h2>Hand 2 · Red brush</h2>
+      <div class="hand" id="h2">
+        <div class="hd"><span class="hlabel">HAND 2</span><span class="hconf"></span></div>
+        <div class="number"><b id="h2number" class="idle">–</b><i>Number</i></div>
+        <div class="gesture idle" id="h2gname">-</div>
+        <div class="lights">
+          <span class="light" data-f="T">T</span>
+          <span class="light" data-f="I">I</span>
+          <span class="light" data-f="M">M</span>
+          <span class="light" data-f="R">R</span>
+          <span class="light" data-f="P">P</span>
+        </div>
+        <div class="hrow"><span>INDEX</span><b id="h2idx">-</b></div>
+        <div class="hrow"><span>SPEED</span><b id="h2spd">-</b></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span>CAMERA</span><b id="camStat">off</b></div>
+        <div class="stat"><span>FPS</span><b id="fps">0</b></div>
+        <div class="stat"><span>MODEL</span><b>MediaPipe Hands</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="msg">
+    <p>Numbers 0–5: fist, point, peace, three, four, palm.<br>Bonus: 6 thumbs up · 7 rock · OK sign.<br>Optional: toggle <b>Draw</b> and trace shapes with both index fingers.</p>
+    <button id="msgStartBtn">[ Start Camera ]</button>
+  </div>
+
+  <div id="err" class="hidden"></div>
+
+<script src="vendor/mediapipe/hands.js"></script>
+<script>
+(function () {
+  const cv      = document.getElementById('cv');
+  const ctx     = cv.getContext('2d');
+  const video   = document.getElementById('video');
+  const hint    = document.getElementById('camHint');
+  const W = cv.width = 1280;
+  const H = cv.height = 720;
+
+  const hud = {
+    startBtn: document.getElementById('startBtn'),
+    msgStartBtn: document.getElementById('msgStartBtn'),
+    mirrorBtn: document.getElementById('mirrorBtn'),
+    drawBtn: document.getElementById('drawBtn'),
+    clearDrawBtn: document.getElementById('clearDrawBtn'),
+    msg: document.getElementById('msg'),
+    err: document.getElementById('err'),
+    fps: document.getElementById('fps'),
+    camStat: document.getElementById('camStat'),
+    hands: [document.getElementById('h1'), document.getElementById('h2')],
+    num: [document.getElementById('h1number'), document.getElementById('h2number')],
+    gname: [document.getElementById('h1gname'), document.getElementById('h2gname')],
+    idx: [document.getElementById('h1idx'), document.getElementById('h2idx')],
+    spd: [document.getElementById('h1spd'), document.getElementById('h2spd')]
+  };
+
+  let running = false;
+  let mirrored = true;
+  let drawOn = false;
+  let stream = null;
+  let raf = 0;
+  let prevPts = [null, null];
+  let resultsReady = false;
+  let frameCount = 0;
+  let modelWarned = false;
+
+  const brushes = [
+    { color: '#e6e6e6', stroke: null, strokes: [], lastSeen: -100000, smooth: { x: 0, y: 0, init: false } },
+    { color: '#ff2436', stroke: null, strokes: [], lastSeen: -100000, smooth: { x: 0, y: 0, init: false } }
+  ];
+  const LOST_MS = 350;
+
+  const CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+  const NUMBERS = { 'FIST': 0, 'PINCH': 1, 'POINT': 1, 'L SIGN': 2, 'PEACE': 2, 'THREE': 3, 'FOUR': 4, 'OPEN PALM': 5, 'THUMBS UP': 6, 'THUMBS DOWN': 6, 'ROCK': 7, 'ROCK ON': 7, 'OK': 0 };
+
+  function setErr(msg, ok) {
+    hud.err.textContent = msg;
+    hud.err.classList.remove('hidden', 'ok');
+    if (ok) hud.err.classList.add('ok');
+  }
+  function clearErr() { hud.err.classList.add('hidden'); }
+
+  window.addEventListener('error', function (e) {
+    setErr('JS error: ' + (e && e.message ? e.message : e));
+    if (e && e.error) console.error(e.error);
+  });
+
+  function start() {
+    if (running) return;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setErr('Camera needs a secure context. Open via https:// or file://');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } })
+      .then(function (s) {
+        stream = s;
+        video.srcObject = s;
+        return video.play();
+      })
+      .then(function () {
+        running = true;
+        hud.camStat.textContent = 'on';
+        hud.msg.classList.add('hidden');
+        hint.classList.add('hidden');
+        video.classList.add('on');
+        clearErr();
+        raf = requestAnimationFrame(processFrame);
+      })
+      .catch(function (e) {
+        setErr('Camera error: ' + ((e && e.name) ? e.name + ': ' + e.message : e));
+        stop();
+      });
+  }
+
+  function stop() {
+    running = false;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); }
+    stream = null;
+    video.srcObject = null;
+    video.classList.remove('on');
+    hint.classList.remove('hidden');
+    hud.camStat.textContent = 'off';
+    ctx.clearRect(0, 0, W, H);
+    prevPts = [null, null];
+    clearHands();
+  }
+
+  function clearDrawings() {
+    brushes.forEach(function (b) { b.strokes = []; b.stroke = null; });
+  }
+
+  function clearHands() {
+    hud.hands.forEach(function (el) {
+      el.classList.remove('on');
+      el.querySelectorAll('.light').forEach(function (l) { l.classList.remove('on'); });
+    });
+    hud.num.forEach(function (el) { el.textContent = '–'; el.classList.add('idle'); });
+    hud.gname.forEach(function (el) { el.textContent = '-'; el.classList.add('idle'); });
+  }
+
+  function putLight(idx, on) {
+    hud.hands[idx].querySelectorAll('.light').forEach(function (l, i) {
+      l.classList.toggle('on', !!(on[i]));
+    });
+  }
+
+  function putGesture(i, res) {
+    if (res) {
+      hud.num[i].textContent = String(res.num);
+      hud.num[i].classList.remove('idle');
+      hud.gname[i].textContent = res.name;
+      hud.gname[i].classList.remove('idle');
+    } else {
+      hud.num[i].textContent = '–';
+      hud.num[i].classList.add('idle');
+      hud.gname[i].textContent = '-';
+      hud.gname[i].classList.add('idle');
+    }
+  }
+
+  function dist(a, b) {
+    const dx = a.x - b.x, dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function fingerStates(lm) {
+    const wrist = lm[0];
+    const palm = Math.max(0.05, dist(lm[0], lm[9]));
+    const factor = 0.05 * palm;
+    const pairs = [[3, 4], [6, 8], [10, 12], [14, 16], [18, 20]];
+    return pairs.map(function (p) {
+      const base = lm[p[0]], tip = lm[p[1]];
+      return dist(tip, wrist) > dist(base, wrist) + factor;
+    });
+  }
+
+  function gestureOf(lm, open) {
+    const palm = Math.max(0.05, dist(lm[0], lm[9]));
+    const pinchT = 0.35 * palm;
+    const pinch = dist(lm[8], lm[4]) < pinchT;
+    const fingers = open.slice(1);
+    const n = fingers.reduce(function (a, b) { return a + (b ? 1 : 0); }, 0);
+    const thumbUp = lm[4].y < lm[2].y;
+
+    let name;
+    if (open[0] && open[1] && !open[2] && !open[3] && !open[4]) {
+      name = 'L SIGN';
+    } else if (open[1] && open[4] && !open[2] && !open[3]) {
+      name = open[0] ? 'ROCK ON' : 'ROCK';
+    } else if (open[0] && !open[1] && !open[2] && !open[3] && !open[4]) {
+      name = thumbUp ? 'THUMBS UP' : 'THUMBS DOWN';
+    } else if (pinch && open[1] && open[2] && open[3] && open[4]) {
+      name = 'OK';
+    } else if (open[0] && open[1] && open[2] && open[3] && open[4]) {
+      name = 'OPEN PALM';
+    } else if (!open[0] && n === 0) {
+      name = 'FIST';
+    } else if (n === 1 && open[1]) {
+      name = 'POINT';
+    } else if (n === 2 && open[1] && open[2]) {
+      name = 'PEACE';
+    } else if (open[1] && open[2] && open[3] && !open[4]) {
+      name = 'THREE';
+    } else if (open[1] && open[2] && open[3] && open[4]) {
+      name = 'FOUR';
+    } else if (pinch) {
+      name = 'PINCH';
+    } else {
+      name = 'FIST';
+    }
+    return { name: name, num: NUMBERS[name] };
+  }
+
+  function px(x, y) { return [(mirrored ? 1 - x : x) * W, y * H]; }
+
+  function drawImageSafe(result) {
+    const src = result.image || video;
+    ctx.save();
+    if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(src, 0, 0, W, H);
+    ctx.restore();
+  }
+
+  function drawHand(lm, label, res) {
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    CONNECTIONS.forEach(function (c) {
+      const a = px(lm[c[0]].x, lm[c[0]].y);
+      const b = px(lm[c[1]].x, lm[c[1]].y);
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+    });
+    ctx.stroke();
+
+    for (let i = 0; i < 21; i++) {
+      const pt = px(lm[i].x, lm[i].y);
+      const fg = i === 4 || i === 8 || i === 12 || i === 16 || i === 20;
+      ctx.beginPath();
+      ctx.arc(pt[0], pt[1], fg ? 8 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = fg ? '#ff2436' : '#ffffff';
+      ctx.fill();
+    }
+
+    const [wx, wy] = px(lm[0].x, lm[0].y - 0.12);
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillStyle = '#ff2436';
+    ctx.strokeText(String(res.num) + ' ' + res.name, wx, wy);
+    ctx.fillText(String(res.num) + ' ' + res.name, wx, wy);
+  }
+
+  function pushDrawPoint(hi, pt) {
+    const b = brushes[hi];
+    if (!b.stroke) {
+      b.stroke = { pts: [] };
+      b.strokes.push(b.stroke);
+    }
+    const pts = b.stroke.pts;
+    const last = pts[pts.length - 1];
+    if (last && Math.hypot(pt.x - last.x, pt.y - last.y) < 3) return;
+    pts.push(pt);
+  }
+
+  function paintStrokes() {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    brushes.forEach(function (b) {
+      b.strokes.forEach(function (s) {
+        const pts = s.pts;
+        if (pts.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 7;
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 14;
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const mx = (pts[i].x + pts[i + 1].x) / 2;
+          const my = (pts[i].y + pts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+        }
+        const tail = pts[pts.length - 1];
+        ctx.lineTo(tail.x, tail.y);
+        ctx.stroke();
+      });
+      const active = b.stroke;
+      if (active && active.pts.length) {
+        const head = active.pts[active.pts.length - 1];
+        const seenNow = performance.now() - b.lastSeen < 250;
+        if (seenNow) {
+          ctx.beginPath();
+          ctx.strokeStyle = b.color;
+          ctx.lineWidth = 3;
+          ctx.shadowBlur = 0;
+          ctx.arc(head.x, head.y, 22, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.fillStyle = b.color;
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 16;
+          ctx.arc(head.x, head.y, 7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    });
+    ctx.shadowBlur = 0;
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function drawBanner(text, color) {
+    if (!text) return;
+    ctx.font = 'bold 26px monospace';
+    const w = ctx.measureText(text).width + 48;
+    const bw = Math.min(w, W - 28);
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, 14, 14, bw, 50, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 32px monospace';
+    ctx.fillStyle = color || '#ff2436';
+    ctx.fillText(text, 32, 40);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawLoading() {
+    ctx.fillStyle = 'rgba(0,0,0,0.9)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#616161';
+    ctx.font = 'bold 26px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('LOADING HAND MODEL…', W / 2, H / 2);
+  }
+
+  function drawResults(result) {
+    const hands = result.multiHandLandmarks || [];
+    resultsReady = true;
+    const now = performance.now();
+
+    drawImageSafe(result);
+    if (drawOn) paintStrokes();
+
+    const gestureLabels = [];
+    for (let i = 0; i < 2; i++) {
+      const el = hud.hands[i];
+      if (i < hands.length) {
+        const lm = hands[i];
+        const label = (result.multiHandedness && result.multiHandedness[i].label) || 'Right';
+        const conf = result.multiHandedness && result.multiHandedness[i].score;
+        const open = fingerStates(lm);
+        const res = gestureOf(lm, open);
+        gestureLabels.push(res.name + ' ' + res.num);
+
+        drawHand(lm, label, res);
+
+        el.classList.add('on');
+        el.querySelector('.hlabel').textContent = 'HAND ' + (i + 1) + ' \u00b7 ' + label.toUpperCase();
+        el.querySelector('.hconf').textContent = '(' + (conf ? conf.toFixed(2) : '-') + ')';
+        putLight(i, open);
+        putGesture(i, res);
+
+        const [ix, iy] = px(lm[8].x, lm[8].y);
+        hud.idx[i].textContent = lm[8].x.toFixed(3) + '  ' + lm[8].y.toFixed(3);
+
+        if (prevPts[i]) {
+          const d = Math.hypot(ix - prevPts[i][0], iy - prevPts[i][1]);
+          hud.spd[i].textContent = d.toFixed(0) + ' px';
+        } else {
+          hud.spd[i].textContent = '-';
+        }
+        prevPts[i] = [ix, iy];
+
+        brushes[i].lastSeen = now;
+        if (drawOn) {
+          const raw = { x: ix, y: iy };
+          const sm = brushes[i].smooth;
+          if (!sm.init) {
+            sm.x = raw.x;
+            sm.y = raw.y;
+            sm.init = true;
+          } else {
+            const spd = Math.hypot(raw.x - sm.x, raw.y - sm.y);
+            const a = Math.min(1, Math.max(0.2, spd / 140));
+            sm.x += (raw.x - sm.x) * a;
+            sm.y += (raw.y - sm.y) * a;
+          }
+          pushDrawPoint(i, { x: sm.x, y: sm.y });
+        }
+      } else {
+        el.classList.remove('on');
+        prevPts[i] = null;
+        putLight(i, [false, false, false, false, false]);
+        putGesture(i, null);
+        hud.idx[i].textContent = '-';
+        hud.spd[i].textContent = '-';
+        if (now - brushes[i].lastSeen > LOST_MS) brushes[i].stroke = null;
+      }
+    }
+
+    if (gestureLabels.length) drawBanner(gestureLabels.join('  +  '));
+  }
+
+  async function processFrame() {
+    if (!running) return;
+    try {
+      await window.hands.send({ image: video });
+      frameCount++;
+    } catch (e) {
+      if (!modelWarned) {
+        modelWarned = true;
+        setErr('Hand model failed to load. Serve this folder over a local web server (see README).');
+      }
+    }
+    if (running) raf = requestAnimationFrame(processFrame);
+  }
+
+  setInterval(function () {
+    hud.fps.textContent = frameCount;
+    frameCount = 0;
+    if (running && !resultsReady && video.readyState >= 2) drawLoading();
+  }, 500);
+
+  if (window.Hands) {
+    window.hands = new Hands({
+      locateFile: function (file) {
+        return 'vendor/mediapipe/' + file;
+      }
+    });
+    window.hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    window.hands.onResults(drawResults);
+  } else {
+    setErr('MediaPipe failed to load. Serve this folder over a local web server (see README).');
+  }
+
+  function startAll() {
+    if (!window.hands) {
+      setErr('MediaPipe not loaded yet. Retry in a moment.');
+      return;
+    }
+    if (running) stop();
+    start();
+  }
+
+  hud.startBtn.addEventListener('click', startAll);
+  hud.msgStartBtn.addEventListener('click', startAll);
+  hud.mirrorBtn.addEventListener('click', function () {
+    mirrored = !mirrored;
+    clearDrawings();
+    hud.mirrorBtn.textContent = 'Mirror: ' + (mirrored ? 'ON' : 'OFF');
+  });
+  hud.drawBtn.addEventListener('click', function () {
+    drawOn = !drawOn;
+    hud.drawBtn.textContent = 'Draw: ' + (drawOn ? 'ON' : 'OFF');
+  });
+  hud.clearDrawBtn.addEventListener('click', function () {
+    clearDrawings();
+    ctx.clearRect(0, 0, W, H);
+  });
+
+  const SWATCHES = ['#e6e6e6', '#ff2436', '#ffcc00', '#39ff14', '#00d0ff', '#7a5cff', '#ff5cff', '#ff7a2b'];
+  const swEls = [document.getElementById('sw1'), document.getElementById('sw2')];
+  const colorInputs = [document.getElementById('color1'), document.getElementById('color2')];
+  const brushLabels = [document.getElementById('bl1'), document.getElementById('bl2')];
+
+  function applyBrushColor(i, color) {
+    brushes[i].color = color;
+    colorInputs[i].value = color;
+    swEls[i].querySelectorAll('.swatch').forEach(function (el, idx) {
+      el.classList.toggle('sel', SWATCHES[idx].toLowerCase() === color.toLowerCase());
+    });
+    brushLabels[i].textContent = 'Brush ' + (i + 1) + ' \u00b7 ' + color.toUpperCase();
+  }
+
+  SWATCHES.forEach(function (color, idx) {
+    swEls.forEach(function (wrap, i) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.style.background = color;
+      b.style.boxShadow = color === '#e6e6e6' ? 'inset 0 0 0 1px #555' : '';
+      b.addEventListener('click', function () { applyBrushColor(i, color); });
+      wrap.appendChild(b);
+    });
+  });
+
+  colorInputs.forEach(function (input, i) {
+    input.addEventListener('input', function () { applyBrushColor(i, this.value); });
+  });
+
+  applyBrushColor(0, brushes[0].color);
+  applyBrushColor(1, brushes[1].color);
+}());
+</script>
+</body>
+</html>
